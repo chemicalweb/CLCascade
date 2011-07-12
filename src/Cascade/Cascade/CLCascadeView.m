@@ -25,10 +25,6 @@
 - (NSArray*) visiblePages;
 - (NSArray*) pagesOnStock;
 
-- (UIView*) previousPage:(UIView*)page;
-- (UIView*) nextPage:(UIView*)page;
-- (UIView*) firstPageOnStock;
-
 - (BOOL) pageExistAtIndex:(NSInteger)index;
 - (void) unloadInvisiblePagesOnStock;
 
@@ -157,7 +153,7 @@
     }
     
     CGSize size = [self calculatePageSize: newPage];
-    CGRect frame = CGRectMake(CGRectGetMaxX(fromPage.frame), 0.0f, size.width, size.height);
+    CGRect frame = CGRectMake(MAX(0, ([_pages count]) * _scrollView.frame.size.width), 0.0f, size.width, size.height);
     
     if (fromPage == nil) {
         [self popAllPagesAnimated: animated];
@@ -184,7 +180,7 @@
         // scroll to new page frame
         if (!_flags.hasWiderPage) {
             if (UIInterfaceOrientationIsPortrait(interfaceOrienation)) {
-                [_scrollView setContentOffset:CGPointMake(index * _pageWidth - _leftInset, 0.0f) animated:animated];
+                [_scrollView setContentOffset:CGPointMake(index * _pageWidth - (self.bounds.size.width - _pageWidth - _leftInset), 0.0f) animated:animated];
             } else {
                 [_scrollView setContentOffset:CGPointMake(index * _pageWidth - _pageWidth, 0.0f) animated:animated];
             }
@@ -241,13 +237,12 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void) popAllPagesAnimated:(BOOL)animated {
-    id item = nil;
     // index of last page
     NSUInteger index = [_pages count] - 1;
     // pop page from back
     NSEnumerator* enumerator = [_pages reverseObjectEnumerator];
     // enumarate pages
-    while ((item = [enumerator nextObject])) {
+    while ([enumerator nextObject]) {
         // pop page at index
         [self popPageAtIndex:index animated:NO];
         index--;
@@ -473,31 +468,6 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-- (UIView*) nextPage:(UIView*)page {
-    
-    NSUInteger index = [_pages indexOfObject: page];
-    
-    if (index != [_pages count] - 1) {
-        return [_pages objectAtIndex: index + 1];
-    }
-    
-    return nil;
-}
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-- (UIView*) previousPage:(UIView*)page {
-    NSUInteger index = [_pages indexOfObject: page];
-    
-    if (index != 0) {
-        return [_pages objectAtIndex: index - 1];
-    }
-    
-    return nil;
-}
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
 - (BOOL) pageExistAtIndex:(NSInteger)index {
     return (([_pages count] > 0) &&
             (index >= 0) && 
@@ -596,23 +566,6 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-- (UIView*) firstPageOnStock {
-    // calculate first visible page
-    NSInteger firstVisiblePageIndex = [self indexOfFirstVisiblePage];
-    
-    // get first visible page
-    id item = [_pages objectAtIndex: firstVisiblePageIndex];
-    
-    // chceck if is loaded, and load if needed
-    if (item == [NSNull null]) {
-        return [self loadPageAtIndex: firstVisiblePageIndex];
-    }
-    // return page
-    return item;
-}
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void) unloadPage:(UIView*)page remove:(BOOL)remove {
     // get index of page
     NSUInteger index = [_pages indexOfObject: page];
@@ -627,6 +580,12 @@
         
         // check if remove
         if (remove) {
+            
+            // check if last page is wider page
+            if ((index == ([_pages count] -1)) && (_flags.hasWiderPage)) {
+                _flags.hasWiderPage = NO;
+            }
+            
             // remove from array
             [_pages removeObject: page];
         } else {
